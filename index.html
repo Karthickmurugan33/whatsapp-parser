@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>WhatsApp Group Members Parser (All Actions)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f7f9fb;
+      color: #333;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    input[type="file"],
+    input[type="date"] {
+      margin-bottom: 15px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 100%;
+    }
+
+    button {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .date-inputs {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>WhatsApp Group Members Parser</h2>
+
+    <input type="file" id="fileInput" multiple />
+
+    <div class="date-inputs">
+      <div>
+        <label>Start Date:</label>
+        <input type="date" id="startDate">
+      </div>
+      <div>
+        <label>End Date:</label>
+        <input type="date" id="endDate">
+      </div>
+    </div>
+
+    <button onclick="processFiles()">Process & Download Excel</button>
+  </div>
+
+  <script>
+    function processFiles() {
+      const files = document.getElementById('fileInput').files;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+
+      if (!files.length) {
+        alert("Please upload at least one file.");
+        return;
+      }
+
+      let results = [];
+      let filesProcessed = 0;
+
+      Array.from(files).forEach(file => {
+        const groupName = file.name.replace('.txt', '');
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const lines = e.target.result.split('\n');
+
+          lines.forEach(line => {
+            // ✅ Added by admin
+            const addedMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?added\s(.+)/i);
+            if (addedMatch) {
+              const dateISO = formatDate(addedMatch[1]);
+              const person = addedMatch[2].trim();
+              if (checkDateInRange(dateISO, startDate, endDate)) {
+                results.push({
+                  Group: groupName,
+                  Date: dateISO,
+                  Action: 'Added by Admin',
+                  Person: person
+                });
+              }
+            }
+
+            // ✅ Joined via invite link
+            const inviteMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?(\+91\s?\d{5}\s?\d{5}) joined using this group's invite link/i);
+            if (inviteMatch) {
+              const dateISO = formatDate(inviteMatch[1]);
+              const phone = inviteMatch[2].replace(/\s/g, '');
+              if (checkDateInRange(dateISO, startDate, endDate)) {
+                results.push({
+                  Group: groupName,
+                  Date: dateISO,
+                  Action: 'Joined via Invite Link',
+                  Person: phone
+                });
+              }
+            }
+
+            // ✅ Left members
+            const leftMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?-\s(.+?) left/i);
+            if (leftMatch) {
+              const dateISO = formatDate(leftMatch[1]);
+              const person = leftMatch[2].trim();
+              if (checkDateInRange(dateISO, startDate, endDate)) {
+                results.push({
+                  Group: groupName,
+                  Date: dateISO,
+                  Action: 'Left',
+                  Person: person
+                });
+              }
+            }
+          });
+
+          filesProcessed++;
+          if (filesProcessed === files.length) {
+            if (results.length === 0) {
+              alert(`No data found between ${startDate || "Start"} and ${endDate || "End"}.`);
+            } else {
+              exportToExcel(results);
+            }
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    function formatDate(dateStr) {
+      const parts = dateStr.split('/');
+      const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+      return `${year}-${parts[1]}-${parts[0]}`;
+    }
+
+    function checkDateInRange(date, start, end) {
+      if (!start && !end) return true;
+      if (start && date < start) return false;
+      if (end && date > end) return false;
+      return true;
+    }
+
+    function exportToExcel(data) {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "AllActions");
+
+      XLSX.writeFile(wb, "WhatsApp_All_Actions_Report.xlsx");
+    }
+  </script>
+</body>
+
+</html>
