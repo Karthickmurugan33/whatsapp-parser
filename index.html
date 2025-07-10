@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="UTF-8" />
-  <title>WhatsApp Group Members Parser (All Actions)</title>
+  <title>WhatsApp Group Report (Custom Format)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
@@ -12,35 +11,27 @@
       background: #f7f9fb;
       color: #333;
     }
-
     h2 {
       text-align: center;
-      color: #333;
     }
-
     .container {
       max-width: 600px;
       margin: auto;
       background: #fff;
       padding: 30px;
       border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-
     label {
       font-weight: bold;
-      margin-right: 10px;
     }
-
-    input[type="file"],
-    input[type="date"] {
+    input[type="file"], input[type="date"] {
       margin-bottom: 15px;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 5px;
       width: 100%;
     }
-
     button {
       background: #007bff;
       color: #fff;
@@ -51,11 +42,9 @@
       font-size: 16px;
       width: 100%;
     }
-
     button:hover {
       background: #0056b3;
     }
-
     .date-inputs {
       display: flex;
       justify-content: space-between;
@@ -63,10 +52,9 @@
     }
   </style>
 </head>
-
 <body>
   <div class="container">
-    <h2>WhatsApp Group Members Parser</h2>
+    <h2>WhatsApp Group Report (Custom Format)</h2>
 
     <input type="file" id="fileInput" multiple />
 
@@ -99,9 +87,8 @@
       let filesProcessed = 0;
 
       Array.from(files).forEach(file => {
-        const groupName = file.name.replace('.txt', '');
         const reader = new FileReader();
-        reader.onload = function (e) {
+        reader.onload = function(e) {
           const lines = e.target.result.split('\n');
 
           lines.forEach(line => {
@@ -112,9 +99,8 @@
               const person = addedMatch[2].trim();
               if (checkDateInRange(dateISO, startDate, endDate)) {
                 results.push({
-                  Group: groupName,
                   Date: dateISO,
-                  Action: 'Added by Admin',
+                  Action: 'Add',
                   Person: person
                 });
               }
@@ -127,9 +113,8 @@
               const phone = inviteMatch[2].replace(/\s/g, '');
               if (checkDateInRange(dateISO, startDate, endDate)) {
                 results.push({
-                  Group: groupName,
                   Date: dateISO,
-                  Action: 'Joined via Invite Link',
+                  Action: 'Joined',
                   Person: phone
                 });
               }
@@ -142,13 +127,27 @@
               const person = leftMatch[2].trim();
               if (checkDateInRange(dateISO, startDate, endDate)) {
                 results.push({
-                  Group: groupName,
                   Date: dateISO,
                   Action: 'Left',
                   Person: person
                 });
               }
             }
+
+            // ✅ Removed members
+            const removedMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?removed\s(.+?) from the group/i);
+            if (removedMatch) {
+              const dateISO = formatDate(removedMatch[1]);
+              const person = removedMatch[2].trim();
+              if (checkDateInRange(dateISO, startDate, endDate)) {
+                results.push({
+                  Date: dateISO,
+                  Action: 'Removed',
+                  Person: person
+                });
+              }
+            }
+
           });
 
           filesProcessed++;
@@ -170,6 +169,13 @@
       return `${year}-${parts[1]}-${parts[0]}`;
     }
 
+    function formatDateToReport(dateStr) {
+      // Converts YYYY-MM-DD to "D Month" format
+      const dateObj = new Date(dateStr);
+      const options = { day: 'numeric', month: 'long' };
+      return dateObj.toLocaleDateString('en-GB', options);
+    }
+
     function checkDateInRange(date, start, end) {
       if (!start && !end) return true;
       if (start && date < start) return false;
@@ -178,13 +184,25 @@
     }
 
     function exportToExcel(data) {
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "AllActions");
+      // ✅ Transform data into required report format
+      let formatted = [];
 
-      XLSX.writeFile(wb, "WhatsApp_All_Actions_Report.xlsx");
+      data.forEach(entry => {
+        let row = { Date: formatDateToReport(entry.Date), Add: "", Joined: "", Left: "", Removed: "" };
+        if (entry.Action === 'Add') row.Add = entry.Person;
+        else if (entry.Action === 'Joined') row.Joined = entry.Person;
+        else if (entry.Action === 'Left') row.Left = entry.Person;
+        else if (entry.Action === 'Removed') row.Removed = entry.Person;
+
+        formatted.push(row);
+      });
+
+      const ws = XLSX.utils.json_to_sheet(formatted, { header: ["Date", "Add", "Joined", "Left", "Removed"] });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+
+      XLSX.writeFile(wb, "WhatsApp_Custom_Report.xlsx");
     }
   </script>
 </body>
-
 </html>
