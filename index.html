@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="UTF-8" />
-  <title>WhatsApp Group Parser with Date Filter & Group Name</title>
+  <title>WhatsApp Group Report (Custom Format)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
@@ -12,33 +11,27 @@
       background: #f7f9fb;
       color: #333;
     }
-
+    h2 {
+      text-align: center;
+    }
     .container {
       max-width: 700px;
       margin: auto;
       background: #fff;
       padding: 30px;
       border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-
-    h2 {
-      text-align: center;
-    }
-
     label {
       font-weight: bold;
     }
-
-    input[type="file"],
-    input[type="date"] {
+    input[type="file"], input[type="date"] {
       margin-bottom: 15px;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 5px;
       width: 100%;
     }
-
     button {
       background: #007bff;
       color: #fff;
@@ -49,11 +42,9 @@
       font-size: 16px;
       width: 100%;
     }
-
     button:hover {
       background: #0056b3;
     }
-
     .date-inputs {
       display: flex;
       justify-content: space-between;
@@ -64,7 +55,7 @@
 
 <body>
   <div class="container">
-    <h2>WhatsApp Group Parser with Date Filter & Group Name</h2>
+    <h2>WhatsApp Group Report (Custom Format)</h2>
 
     <input type="file" id="fileInput" multiple />
 
@@ -97,51 +88,76 @@
       let filesProcessed = 0;
 
       Array.from(files).forEach(file => {
-        const groupName = file.name.replace('.txt', '');
+        const groupName = file.name.replace('.txt','');
         const reader = new FileReader();
-        reader.onload = function (e) {
+        reader.onload = function(e) {
           const lines = e.target.result.split('\n');
 
           lines.forEach(line => {
-            // ✅ Added by admin
-            const addedMatch = line.match(/(\d{2}\/\d{2}\/\d{4}),.*?added\s(.+)/i);
+            const addedMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?added\s(.+)/i);
             if (addedMatch) {
               const date = formatDateToDDMMYYYY(addedMatch[1]);
+              const person = extractLast10Digits(addedMatch[2].trim());
               if (checkDateInRange(convertDateForCompare(date), startDate, endDate)) {
-                const person = extractLast10Digits(addedMatch[2].trim());
-                results.push({ Group: groupName, Date: date, Add: person, Joined: "", Left: "", Removed: "" });
+                results.push({
+                  Group: groupName,
+                  Date: date,
+                  Add: person,
+                  Joined: "",
+                  Left: "",
+                  Removed: ""
+                });
               }
             }
 
-            // ✅ Joined via invite link
-            const inviteMatch = line.match(/(\d{2}\/\d{2}\/\d{4}),.*?(\+?\d{1,4}\s?\d{5}\s?\d{5}) joined using this group's invite link/i);
+            const inviteMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?(\+?\d{1,4}\s?\d{5}\s?\d{5}) joined using this group's invite link/i);
             if (inviteMatch) {
               const date = formatDateToDDMMYYYY(inviteMatch[1]);
+              const phone = extractLast10Digits(inviteMatch[2].replace(/\s/g, ''));
               if (checkDateInRange(convertDateForCompare(date), startDate, endDate)) {
-                const phone = extractLast10Digits(inviteMatch[2].replace(/\s/g, ''));
-                results.push({ Group: groupName, Date: date, Add: "", Joined: phone, Left: "", Removed: "" });
+                results.push({
+                  Group: groupName,
+                  Date: date,
+                  Add: "",
+                  Joined: phone,
+                  Left: "",
+                  Removed: ""
+                });
               }
             }
 
-            // ✅ Left members
-            const leftMatch = line.match(/(\d{2}\/\d{2}\/\d{4}),.*?-\s(.+?) left/i);
+            const leftMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?-\s(.+?) left/i);
             if (leftMatch) {
               const date = formatDateToDDMMYYYY(leftMatch[1]);
+              const person = extractLast10Digits(leftMatch[2].trim());
               if (checkDateInRange(convertDateForCompare(date), startDate, endDate)) {
-                const person = extractLast10Digits(leftMatch[2].trim());
-                results.push({ Group: groupName, Date: date, Add: "", Joined: "", Left: person, Removed: "" });
+                results.push({
+                  Group: groupName,
+                  Date: date,
+                  Add: "",
+                  Joined: "",
+                  Left: person,
+                  Removed: ""
+                });
               }
             }
 
-            // ✅ Removed members
-            const removedMatch = line.match(/(\d{2}\/\d{2}\/\d{4}),.*?removed\s(.+?) from the group/i);
+            const removedMatch = line.match(/(\d{2}\/\d{2}\/\d{2}),.*?removed\s(.+?) from the group/i);
             if (removedMatch) {
               const date = formatDateToDDMMYYYY(removedMatch[1]);
+              const person = extractLast10Digits(removedMatch[2].trim());
               if (checkDateInRange(convertDateForCompare(date), startDate, endDate)) {
-                const person = extractLast10Digits(removedMatch[2].trim());
-                results.push({ Group: groupName, Date: date, Add: "", Joined: "", Left: "", Removed: person });
+                results.push({
+                  Group: groupName,
+                  Date: date,
+                  Add: "",
+                  Joined: "",
+                  Left: "",
+                  Removed: person
+                });
               }
             }
+
           });
 
           filesProcessed++;
@@ -159,7 +175,8 @@
 
     function formatDateToDDMMYYYY(dateStr) {
       const parts = dateStr.split('/');
-      return `${parts[0]}/${parts[1]}/${parts[2]}`;
+      const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+      return `${parts[0]}/${parts[1]}/${year}`;
     }
 
     function convertDateForCompare(dateStr) {
@@ -167,17 +184,19 @@
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
+    function extractLast10Digits(text) {
+      const digits = text.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        return digits.slice(-10);
+      }
+      return text; // return name as is if not a number
+    }
+
     function checkDateInRange(date, start, end) {
       if (!start && !end) return true;
       if (start && date < start) return false;
       if (end && date > end) return false;
       return true;
-    }
-
-    function extractLast10Digits(text) {
-      const digits = text.replace(/\D/g, '');
-      if (digits.length >= 10) return digits.slice(-10);
-      return text; // return name as is if not a number
     }
 
     function exportToExcel(data) {
@@ -188,5 +207,4 @@
     }
   </script>
 </body>
-
 </html>
